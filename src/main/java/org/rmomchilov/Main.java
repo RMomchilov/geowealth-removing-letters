@@ -6,49 +6,72 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.TreeSet;
 
 public class Main {
+
+    public static final int INITIAL_CAPACITY = 50000;
+
     public static void main(String[] args) throws IOException {
-        List<String> words = loadAllWords().stream()
-                .sorted(Comparator.comparingInt(String::length))
+        List<String> dictionary = loadAllWords();
+        TreeSet<String> dictionaryTree = new TreeSet<>(dictionary);
+        List<String> words = dictionary.stream()
+                .filter(word -> word.length() == 9)
                 .toList();
 
         LocalDateTime startTime = LocalDateTime.now();
-        HashMap<String, Boolean> resultsTable = new HashMap<>(words.size() + 2);
-        resultsTable.put("A", true);
-        resultsTable.put("I", true);
+        HashMap<String, Boolean> decompositionTable = new HashMap<>(INITIAL_CAPACITY);
+        decompositionTable.put("A", true);
+        decompositionTable.put("I", true);
 
+        List<String> decomposableWords = new ArrayList<>();
         for (String word : words) {
-            checkWord(word, resultsTable);
-        }
-
-        List<Map.Entry<String, Boolean>> results = resultsTable.entrySet()
-                .stream()
-                .filter((entry) -> entry.getValue() && entry.getKey().length() == 9)
-                .toList();
-        results.forEach(entry -> System.out.println(entry.getKey()));
-        System.out.println("Result count: " + results.size());
-
-        LocalDateTime endTime = LocalDateTime.now();
-        System.out.println("Runtime: " + Duration.between(startTime, endTime).toMillis());
-    }
-
-    private static void checkWord(String word, HashMap<String, Boolean> resultsTable) {
-        for (int i = 0; i < word.length(); i++) {
-            String leftString = word.substring(0, i);
-            String rightString = word.substring(i + 1);
-            if ((leftString.isEmpty() || resultsTable.containsKey(leftString))
-                    && (rightString.isEmpty() || resultsTable.containsKey(rightString))) {
-                resultsTable.put(word, true);
-                return;
+            Boolean decomposable = checkWord(word, dictionaryTree, decompositionTable);
+            if (decomposable) {
+                decomposableWords.add(word);
             }
         }
 
-        resultsTable.put(word, false);
+        decomposableWords.forEach(System.out::println);
+        System.out.println("Result count: " + decomposableWords.size());
+
+        LocalDateTime endTime = LocalDateTime.now();
+        System.out.println("Runtime: " + Duration.between(startTime, endTime).toMillis() + " ms");
+    }
+
+    private static Boolean checkWord(String word, TreeSet<String> dictionaryTree, HashMap<String, Boolean> decompositionTable) {
+        if (word.isEmpty()) {
+            return false;
+        } else if (!word.contains("A") && !word.contains("I")) {
+            decompositionTable.put(word, false);
+            return false;
+        } else if (!dictionaryTree.contains(word)) {
+            decompositionTable.put(word, false);
+            return false;
+        }
+
+        for (int i = 0; i < word.length(); i++) {
+            String leftString = word.substring(0, i);
+            String rightString = word.substring(i + 1);
+            if (decompositionTable.containsKey(leftString + rightString)) {
+                if (decompositionTable.get(leftString + rightString)) {
+                    decompositionTable.put(word, true);
+                    return true;
+                }
+            } else {
+                Boolean decomposable = checkWord(leftString + rightString, dictionaryTree, decompositionTable);
+                if (decomposable) {
+                    decompositionTable.put(word, true);
+                    return true;
+                }
+            }
+        }
+
+        decompositionTable.put(word, false);
+        return false;
     }
 
     private static List<String> loadAllWords() throws IOException {
